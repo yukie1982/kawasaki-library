@@ -291,7 +291,7 @@ function renderBook(book, calil){
       for(const lib of keys){
         const st=s.libkey[lib];
         const near=NEAR.some(n=>lib.startsWith(n))?'<span class="near">近く</span>':"";
-        html+="<tr><td>"+lib+"図書館"+near+'</td><td class="st"><span class="stamp '+stampClass(st)+'">'+st+"</span></td></tr>";
+        html+="<tr><td>"+lib+near+'</td><td class="st"><span class="stamp '+stampClass(st)+'">'+st+"</span></td></tr>";
       }
       html+="</table>";
     }
