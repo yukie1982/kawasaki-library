@@ -199,6 +199,12 @@ function setStatus(msg,busy){ const el=$("status"); el.textContent=msg||""; el.c
 function isIsbn(q){ const d=q.replace(/[-\s]/g,""); return /^(97(8|9))?\d{9}(\d|X)$/i.test(d) ? d : null; }
 
 async function searchBooks(q){
+  // Google Booksは無キー利用のため429(混雑)で断られることがある。その時は国会図書館サーチに切り替える
+  try{ const b=await searchGoogle(q); if(b.length) return b; }catch(e){}
+  return await searchNDL(q);
+}
+
+async function searchGoogle(q){
   const url="https://www.googleapis.com/books/v1/volumes?q="+encodeURIComponent(q)+"&maxResults=8&printType=books&country=JP";
   const r=await fetch(url);
   if(!r.ok) throw new Error("books");
@@ -210,6 +216,39 @@ async function searchBooks(q){
     return { isbn, title:v.title||"（タイトル不明）", authors:(v.authors||[]).join("、"),
       year:(v.publishedDate||"").slice(0,4), thumb:(v.imageLinks||{}).thumbnail };
   }).filter(b=>b.isbn);
+}
+
+function toIsbn13(isbn){
+  if(isbn.length===13) return isbn;
+  const core="978"+isbn.slice(0,9);
+  let s=0; for(let i=0;i<12;i++) s+=(+core[i])*(i%2?3:1);
+  return core+((10-s%10)%10);
+}
+
+async function searchNDL(q){
+  // dpid=iss-ndl-opac: 国会図書館の蔵書目録に限定（お試し版・拡大写本などISBNなしの特殊版を除くため）
+  const url="https://ndlsearch.ndl.go.jp/api/opensearch?title="+encodeURIComponent(q)+"&mediatype=books&cnt=10&dpid=iss-ndl-opac";
+  const r=await fetch(url);
+  if(!r.ok) throw new Error("ndl");
+  const xml=new DOMParser().parseFromString(await r.text(),"text/xml");
+  const DC="http://purl.org/dc/elements/1.1/", DCT="http://purl.org/dc/terms/";
+  const seen=new Set(), out=[];
+  for(const it of xml.getElementsByTagName("item")){
+    let isbn=null;
+    for(const id of it.getElementsByTagNameNS(DC,"identifier")){
+      const t=id.getAttribute("xsi:type")||"";
+      if(t.indexOf("ISBN")>=0){ isbn=id.textContent.replace(/-/g,"").trim(); if(isbn.length===13) break; }
+    }
+    if(!isbn||seen.has(isbn)) continue;
+    seen.add(isbn);
+    const g=(ns,n)=>{const e=it.getElementsByTagNameNS(ns,n)[0];return e?e.textContent:"";};
+    const authors=g(DC,"creator").replace(/,?\s*\d{4}-?(\d{4})?\.?$/,"").replace(/,\s*/g," ").trim();
+    const tEl=it.getElementsByTagName("title")[0];
+    out.push({ isbn, title:g(DC,"title")||(tEl?tEl.textContent:"（タイトル不明）"), authors,
+      year:(g(DCT,"issued").match(/\d{4}/)||[""])[0],
+      thumb:"https://ndlsearch.ndl.go.jp/thumbnail/"+toIsbn13(isbn)+".jpg" });
+  }
+  return out;
 }
 
 async function checkCalil(isbn, systemids, appkey){
@@ -233,7 +272,7 @@ function stampClass(st){
 function renderBook(book, calil){
   const wrap=document.createElement("div");
   wrap.className="book";
-  let html='<div class="bkhead">'+(book.thumb?'<img src="'+book.thumb.replace("http://","https://")+'" alt="">':"")+
+  let html='<div class="bkhead">'+(book.thumb?'<img src="'+book.thumb.replace("http://","https://")+'" alt="" onerror="this.remove()">':"")+
     '<div><h2>'+book.title+'</h2><p class="meta">'+[book.authors,book.year&&book.year+"年"].filter(Boolean).join("／")+
     '</p><p class="isbn">ISBN '+book.isbn+'</p></div></div>';
 
@@ -298,7 +337,7 @@ async function run(){
     for(const b of books){
       const btn=document.createElement("button");
       btn.className="cand";
-      btn.innerHTML=(b.thumb?'<img src="'+b.thumb.replace("http://","https://")+'" alt="">':"")+
+      btn.innerHTML=(b.thumb?'<img src="'+b.thumb.replace("http://","https://")+'" alt="" onerror="this.remove()">':"")+
         "<span>"+b.title+"<small>"+[b.authors,b.year&&b.year+"年"].filter(Boolean).join("／")+"</small></span>";
       btn.onclick=()=>{ $("candidates").innerHTML=""; checkOne(b); };
       $("candidates").appendChild(btn);
