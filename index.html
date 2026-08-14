@@ -137,6 +137,9 @@ a.reserve.sub{background:transparent;color:var(--ink);border:1.5px solid var(--i
 }
 .cand img{width:34px;border:1px solid var(--rule)}
 .cand small{display:block;color:var(--muted);font-size:11px}
+.candbadge{display:block;font-style:normal;font-size:11px;font-weight:700;margin-top:3px}
+.candbadge.ok{color:var(--ok)}
+.candbadge.wait{color:var(--stamp)}
 footer{font-size:11px;color:var(--muted);margin-top:28px;border-top:1px dashed var(--rule);padding-top:10px}
 @media (prefers-reduced-motion: reduce){.spin::after{animation:none;content:"…"}}
 </style>
@@ -173,7 +176,7 @@ footer{font-size:11px;color:var(--muted);margin-top:28px;border-top:1px dashed v
 <div id="results"></div>
 
 <footer>
-  在庫データ: カーリル図書館API ／ 書誌検索: Google Books・国立国会図書館サーチ ／ 版: 2026-08-15d<br>
+  在庫データ: カーリル図書館API ／ 書誌検索: Google Books・国立国会図書館サーチ ／ 版: 2026-08-15e<br>
   予約の確定には川崎市立図書館の利用者番号とパスワードでのログインが必要です（予約ページへのリンクからどうぞ）。
 </footer>
 
@@ -258,15 +261,34 @@ async function searchNDL(q){
   return out;
 }
 
-async function checkCalil(isbn, systemids, appkey){
+async function checkCalilMulti(isbns, systemids, appkey){
   const base="https://api.calil.jp/check?appkey="+encodeURIComponent(appkey)+"&format=json";
-  let data=await jsonp(base+"&isbn="+isbn+"&systemid="+systemids.join(","));
+  let data=await jsonp(base+"&isbn="+isbns.join(",")+"&systemid="+systemids.join(","));
   let guard=0;
   while(data["continue"]===1 && guard++<15){
     await sleep(2000);
     data=await jsonp(base+"&session="+encodeURIComponent(data.session));
   }
-  return data.books ? data.books[isbn] : null;
+  return data.books||{};
+}
+async function checkCalil(isbn, systemids, appkey){
+  return (await checkCalilMulti([isbn], systemids, appkey))[isbn]||null;
+}
+function getSystemids(){
+  const ids=[];
+  if($("sysCity").checked) ids.push("Kanagawa_Kawasaki");
+  if($("sysPref").checked) ids.push("Kanagawa_Pref");
+  return ids;
+}
+// 在庫状況の分類: avail=どこかで貸出可 / held=蔵書はあるが貸出中など / none=蔵書なし
+function classifyHolding(h){
+  if(!h) return "none";
+  let cls="none";
+  for(const sid of Object.keys(h)){
+    const vals=Object.values(h[sid].libkey||{});
+    if(vals.length){ if(vals.indexOf("貸出可")>=0) return "avail"; cls="held"; }
+  }
+  return cls;
 }
 
 function stampClass(st){
@@ -325,9 +347,7 @@ function renderBook(book, calil){
 
 async function checkOne(book){
   const appkey=$("appkey").value.trim();
-  const systemids=[];
-  if($("sysCity").checked) systemids.push("Kanagawa_Kawasaki");
-  if($("sysPref").checked) systemids.push("Kanagawa_Pref");
+  const systemids=getSystemids();
   if(!systemids.length){ setStatus("図書館をひとつ以上選んでください"); return; }
   setStatus("図書館システムに問い合わせ中（少し時間がかかります）",true);
   try{
@@ -348,16 +368,44 @@ async function run(){
   if(isbn){ checkOne({isbn, title:"ISBN "+isbn, authors:"", year:"", thumb:null}); return; }
   setStatus("本を検索中",true);
   try{
-    const books=await searchBooks(q);
+    const books=(await searchBooks(q)).slice(0,10);
     if(!books.length){ setStatus("見つかりませんでした。表記を変えるかISBNで試してみてください。"); return; }
-    setStatus("どの本か選んでください：");
-    for(const b of books){
+    // 候補を川崎の蔵書とまとめて照合し、蔵書のある本だけを表示する
+    let holdings=null;
+    const systemids=getSystemids();
+    if(systemids.length){
+      setStatus("図書館の蔵書と照合中（少し時間がかかります）",true);
+      try{ holdings=await checkCalilMulti(books.map(b=>b.isbn), systemids, $("appkey").value.trim()); }catch(e){}
+    }
+    const makeBtn=(b,badge)=>{
       const btn=document.createElement("button");
       btn.className="cand";
       btn.innerHTML=(b.thumb?'<img src="'+b.thumb.replace("http://","https://")+'" alt="" onerror="this.remove()">':"")+
-        "<span>"+b.title+"<small>"+[b.authors,b.year&&b.year+"年"].filter(Boolean).join("／")+"</small></span>";
+        "<span>"+b.title+"<small>"+[b.authors,b.year&&b.year+"年"].filter(Boolean).join("／")+"</small>"+(badge||"")+"</span>";
       btn.onclick=()=>{ $("candidates").innerHTML=""; checkOne(b); };
-      $("candidates").appendChild(btn);
+      return btn;
+    };
+    if(!holdings){
+      // 照合できなかった時は従来どおり全候補を表示
+      setStatus("どの本か選んでください：");
+      for(const b of books) $("candidates").appendChild(makeBtn(b));
+      return;
+    }
+    const groups={avail:[],held:[],none:[]};
+    for(const b of books) groups[classifyHolding(holdings[b.isbn])].push(b);
+    if(!groups.avail.length && !groups.held.length){
+      setStatus("この検索では、選んだ図書館に蔵書のある本が見つかりませんでした。言葉を変えて試してみてください。");
+      return;
+    }
+    setStatus("図書館に蔵書のある本だけを表示しています。選んでください：");
+    for(const b of groups.avail) $("candidates").appendChild(makeBtn(b,'<em class="candbadge ok">🟢 いますぐ借りられます</em>'));
+    for(const b of groups.held) $("candidates").appendChild(makeBtn(b,'<em class="candbadge wait">🔴 貸出中（予約はできます）</em>'));
+    if(groups.none.length){
+      const det=document.createElement("details");
+      det.className="alllibs";
+      det.innerHTML="<summary>蔵書のなかった本も見る（"+groups.none.length+"冊）</summary>";
+      for(const b of groups.none) det.appendChild(makeBtn(b));
+      $("candidates").appendChild(det);
     }
   }catch(e){ setStatus("検索に失敗しました。通信環境を確認してもう一度お試しください。"); }
 }
