@@ -111,6 +111,11 @@ td.st{text-align:right;white-space:nowrap}
 .stamp.ok{color:var(--ok)}
 .stamp.mid{color:#3E5C87}
 .stamp.none{color:var(--muted);border-style:dashed;transform:none;letter-spacing:.05em}
+.verdict{display:inline-block;font-size:14px;font-weight:700;border:2px solid currentColor;border-radius:8px;padding:5px 12px;margin:6px 0 4px}
+.verdict.ok{color:var(--ok)}
+.verdict.wait{color:var(--stamp)}
+details.alllibs{margin-top:6px}
+details.alllibs summary{font-size:12px;color:var(--muted);cursor:pointer}
 .near{font-size:10px;color:var(--stamp);margin-left:4px}
 a.reserve{
   display:inline-block;
@@ -279,26 +284,36 @@ function renderBook(book, calil){
   for(const [sysid,sysname] of Object.entries(SYSTEMS)){
     const s=calil&&calil[sysid]; if(!s) continue;
     html+='<div class="syswrap"><span class="sysname">'+sysname+'</span>';
-    const keys=Object.keys(s.libkey||{});
+    const libkey=s.libkey||{};
+    const bySort=(a,b)=>{
+      const na=NEAR.findIndex(n=>a.startsWith(n)), nb=NEAR.findIndex(n=>b.startsWith(n));
+      return (na<0?9:na)-(nb<0?9:nb) || a.localeCompare(b,"ja");
+    };
+    const row=lib=>{
+      const near=NEAR.some(n=>lib.startsWith(n))?'<span class="near">近く</span>':"";
+      const st=libkey[lib];
+      return "<tr><td>"+lib+near+'</td><td class="st"><span class="stamp '+stampClass(st)+'">'+st+"</span></td></tr>";
+    };
+    const keys=Object.keys(libkey).sort(bySort);
     if(s.status==="Error"){ html+='<p class="meta">確認できませんでした（時間をおいて再検索してみてください）</p>'; }
     else if(!keys.length){ html+='<p class="meta"><span class="stamp none">蔵書なし</span></p>'; }
     else{
-      keys.sort((a,b)=>{
-        const na=NEAR.findIndex(n=>a.startsWith(n)), nb=NEAR.findIndex(n=>b.startsWith(n));
-        return (na<0?9:na)-(nb<0?9:nb) || a.localeCompare(b,"ja");
-      });
-      html+="<table>";
-      for(const lib of keys){
-        const st=s.libkey[lib];
-        const near=NEAR.some(n=>lib.startsWith(n))?'<span class="near">近く</span>':"";
-        html+="<tr><td>"+lib+near+'</td><td class="st"><span class="stamp '+stampClass(st)+'">'+st+"</span></td></tr>";
+      const avail=keys.filter(k=>libkey[k]==="貸出可");
+      if(avail.length){
+        html+='<p class="verdict ok">🟢 いますぐ借りられます（'+avail.length+'館の棚にあり）</p>';
+        html+="<table>"+avail.map(row).join("")+"</table>";
+        const rest=keys.filter(k=>libkey[k]!=="貸出可");
+        if(rest.length) html+='<details class="alllibs"><summary>ほかの'+rest.length+'館の状況を見る</summary><table>'+rest.map(row).join("")+"</table></details>";
+      }else{
+        html+='<p class="verdict wait">🔴 いま棚にはありません — 借りるなら予約待ちになりそう</p>';
+        html+='<details class="alllibs"><summary>全'+keys.length+'館の状況を見る</summary><table>'+keys.map(row).join("")+"</table></details>";
       }
-      html+="</table>";
     }
-    if(s.reserveurl){
-      const primary=sysid==="Kanagawa_Kawasaki";
-      html+='<a class="reserve'+(primary?"":" sub")+'" href="'+s.reserveurl+'" target="_blank" rel="noopener">'+
-        (primary?"予約ページを開く":"県立の詳細を見る")+" →</a>";
+    if(sysid==="Kanagawa_Kawasaki" && book.isbn && /^\d+$/.test(book.isbn)){
+      html+='<a class="reserve" href="https://www.library.city.kawasaki.jp/totalresult?key='+book.isbn+'&mv=20&sort=0&pcnt=1&reqsch=0" target="_blank" rel="noopener">予約数・待ち状況を公式サイトで確認 →</a> ';
+      if(s.reserveurl) html+='<a class="reserve sub" href="'+s.reserveurl+'" target="_blank" rel="noopener">予約ページ →</a>';
+    }else if(s.reserveurl){
+      html+='<a class="reserve sub" href="'+s.reserveurl+'" target="_blank" rel="noopener">県立の詳細を見る →</a>';
     }
     html+="</div>";
   }
