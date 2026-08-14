@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>かわさき蔵書さがし</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EEEFE8;
+  --card:#F7F6EF;
+  --ink:#23374D;
+  --rule:#AFC2CC;
+  --stamp:#B03A2E;
+  --ok:#2E6B4F;
+  --muted:#6B7A86;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:"Zen Kaku Gothic New",sans-serif;
+  line-height:1.7;
+  padding:20px 16px 64px;
+  max-width:560px;
+  margin:0 auto;
+}
+header{margin-bottom:20px}
+.eyebrow{font-size:11px;letter-spacing:.35em;color:var(--muted);text-transform:uppercase}
+h1{font-family:"Shippori Mincho",serif;font-size:26px;font-weight:700;letter-spacing:.06em}
+h1 span{color:var(--stamp)}
+.lead{font-size:13px;color:var(--muted);margin-top:4px}
+
+.pocket{
+  background:var(--card);
+  border:1.5px solid var(--ink);
+  border-radius:4px 4px 14px 14px;
+  padding:16px;
+  margin-bottom:16px;
+  box-shadow:3px 3px 0 rgba(35,55,77,.12);
+}
+label{font-size:12px;font-weight:700;display:block;margin-bottom:4px}
+input[type=text],input[type=password]{
+  width:100%;
+  border:1px solid var(--rule);
+  border-radius:6px;
+  background:#fff;
+  padding:10px 12px;
+  font-size:16px;
+  font-family:inherit;
+  color:var(--ink);
+}
+input:focus{outline:2px solid var(--ink);outline-offset:1px}
+.row{display:flex;gap:8px;margin-top:10px}
+.row input{flex:1}
+button.go{
+  background:var(--ink);
+  color:#fff;
+  border:none;
+  border-radius:6px;
+  padding:10px 18px;
+  font-size:15px;
+  font-weight:700;
+  font-family:inherit;
+  cursor:pointer;
+}
+button.go:active{transform:translateY(1px)}
+.libs{display:flex;gap:14px;margin-top:10px;font-size:13px}
+.libs label{display:flex;align-items:center;gap:5px;font-weight:500;margin:0}
+.keybox{margin-top:12px;border-top:1px dashed var(--rule);padding-top:10px}
+.keybox summary{font-size:12px;color:var(--muted);cursor:pointer}
+.keybox .inner{margin-top:8px;font-size:12px}
+.keybox a{color:var(--stamp)}
+.hint{font-size:11px;color:var(--muted);margin-top:6px}
+
+#status{font-size:13px;color:var(--muted);min-height:1.5em;margin:8px 2px}
+.spin::after{content:"…";animation:dots 1.2s steps(4) infinite}
+@keyframes dots{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
+
+.book{
+  background:var(--card);
+  border:1px solid var(--rule);
+  border-radius:8px;
+  padding:14px 14px 12px;
+  margin-bottom:14px;
+  background-image:repeating-linear-gradient(transparent,transparent 27px,rgba(175,194,204,.35) 27px,rgba(175,194,204,.35) 28px);
+}
+.book h2{font-family:"Shippori Mincho",serif;font-size:17px;line-height:1.5}
+.meta{font-size:12px;color:var(--muted)}
+.isbn{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted)}
+.bkhead{display:flex;gap:12px}
+.bkhead img{width:48px;height:auto;border:1px solid var(--rule);border-radius:2px;align-self:flex-start}
+
+.syswrap{margin-top:10px}
+.sysname{font-size:12px;font-weight:700;letter-spacing:.08em;border-bottom:1.5px solid var(--ink);display:inline-block;margin-bottom:6px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td{padding:4px 2px;border-bottom:1px dotted var(--rule)}
+td.st{text-align:right;white-space:nowrap}
+.stamp{
+  display:inline-block;
+  border:2px solid currentColor;
+  border-radius:999px;
+  padding:1px 10px;
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:.15em;
+  transform:rotate(-4deg);
+  color:var(--stamp);
+}
+.stamp.ok{color:var(--ok)}
+.stamp.mid{color:#3E5C87}
+.stamp.none{color:var(--muted);border-style:dashed;transform:none;letter-spacing:.05em}
+.near{font-size:10px;color:var(--stamp);margin-left:4px}
+a.reserve{
+  display:inline-block;
+  margin-top:10px;
+  background:var(--stamp);
+  color:#fff;
+  text-decoration:none;
+  font-size:13px;
+  font-weight:700;
+  border-radius:6px;
+  padding:8px 16px;
+}
+a.reserve.sub{background:transparent;color:var(--ink);border:1.5px solid var(--ink)}
+.candidates{margin-top:4px}
+.cand{
+  width:100%;text-align:left;background:var(--card);border:1px solid var(--rule);
+  border-radius:8px;padding:10px 12px;margin-bottom:8px;font-family:inherit;font-size:14px;
+  color:var(--ink);cursor:pointer;display:flex;gap:10px;align-items:center;
+}
+.cand img{width:34px;border:1px solid var(--rule)}
+.cand small{display:block;color:var(--muted);font-size:11px}
+footer{font-size:11px;color:var(--muted);margin-top:28px;border-top:1px dashed var(--rule);padding-top:10px}
+@media (prefers-reduced-motion: reduce){.spin::after{animation:none;content:"…"}}
+</style>
+</head>
+<body>
+<header>
+  <p class="eyebrow">Kawasaki City Library</p>
+  <h1>かわさき<span>蔵書</span>さがし</h1>
+  <p class="lead">本のタイトルかISBNで、川崎の図書館の在庫を確認して予約ページへ。</p>
+</header>
+
+<div class="pocket">
+  <label for="q">本をさがす</label>
+  <div class="row" style="margin-top:0">
+    <input type="text" id="q" placeholder="タイトル・著者名、またはISBN" enterkeyhint="search">
+    <button class="go" id="searchBtn">検索</button>
+  </div>
+  <div class="libs">
+    <label><input type="checkbox" id="sysCity" checked> 川崎市立図書館</label>
+    <label><input type="checkbox" id="sysPref"> 県立（川崎含む）</label>
+  </div>
+  <details class="keybox" id="keybox">
+    <summary>⚙ カーリルAPIキーの設定（初回のみ）</summary>
+    <div class="inner">
+      <label for="appkey">APIキー</label>
+      <input type="password" id="appkey" placeholder="カーリルで取得したキーを貼り付け">
+      <p class="hint">蔵書検索には <a href="https://calil.jp/api/dashboard/" target="_blank" rel="noopener">カーリル図書館API</a>（無料）のキーが必要です。メール登録するとすぐ発行されます。キーはこの端末のブラウザ内にだけ保存され、次回からは入力不要です（Calil以外に送信されることはありません）。</p>
+    </div>
+  </details>
+</div>
+
+<p id="status"></p>
+<div id="candidates" class="candidates"></div>
+<div id="results"></div>
+
+<footer>
+  在庫データ: カーリル図書館API ／ 書誌検索: Google Books<br>
+  予約の確定には川崎市立図書館の利用者番号とパスワードでのログインが必要です（予約ページへのリンクからどうぞ）。
+</footer>
+
+<script>
+const $=id=>document.getElementById(id);
+const NEAR=["幸","川崎"]; // 近隣の分館を上に
+const KEY_STORE="calil_appkey";
+try{ const saved=localStorage.getItem(KEY_STORE); if(saved) $("appkey").value=saved; }catch(e){}
+$("appkey").addEventListener("change",()=>{ try{ localStorage.setItem(KEY_STORE,$("appkey").value.trim()); }catch(e){} });
+const SYSTEMS={ "Kanagawa_Kawasaki":"川崎市立図書館", "Kanagawa_Pref":"神奈川県立図書館" };
+
+function jsonp(url){
+  return new Promise((res,rej)=>{
+    const cb="cb_"+Math.random().toString(36).slice(2);
+    const s=document.createElement("script");
+    const t=setTimeout(()=>{cleanup();rej(new Error("timeout"))},15000);
+    function cleanup(){clearTimeout(t);delete window[cb];s.remove();}
+    window[cb]=d=>{cleanup();res(d);};
+    s.onerror=()=>{cleanup();rej(new Error("network"));};
+    s.src=url+"&callback="+cb;
+    document.body.appendChild(s);
+  });
+}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+function setStatus(msg,busy){ const el=$("status"); el.textContent=msg||""; el.className=busy?"spin":""; }
+
+function isIsbn(q){ const d=q.replace(/[-\s]/g,""); return /^(97(8|9))?\d{9}(\d|X)$/i.test(d) ? d : null; }
+
+async function searchBooks(q){
+  const url="https://www.googleapis.com/books/v1/volumes?q="+encodeURIComponent(q)+"&maxResults=8&printType=books&country=JP";
+  const r=await fetch(url);
+  if(!r.ok) throw new Error("books");
+  const data=await r.json();
+  return (data.items||[]).map(it=>{
+    const v=it.volumeInfo||{};
+    const ids=v.industryIdentifiers||[];
+    const isbn=(ids.find(x=>x.type==="ISBN_13")||ids.find(x=>x.type==="ISBN_10")||{}).identifier;
+    return { isbn, title:v.title||"（タイトル不明）", authors:(v.authors||[]).join("、"),
+      year:(v.publishedDate||"").slice(0,4), thumb:(v.imageLinks||{}).thumbnail };
+  }).filter(b=>b.isbn);
+}
+
+async function checkCalil(isbn, systemids, appkey){
+  const base="https://api.calil.jp/check?appkey="+encodeURIComponent(appkey)+"&format=json";
+  let data=await jsonp(base+"&isbn="+isbn+"&systemid="+systemids.join(","));
+  let guard=0;
+  while(data["continue"]===1 && guard++<15){
+    await sleep(2000);
+    data=await jsonp(base+"&session="+encodeURIComponent(data.session));
+  }
+  return data.books ? data.books[isbn] : null;
+}
+
+function stampClass(st){
+  if(st==="貸出可") return "ok";
+  if(st==="館内のみ"||st==="準備中") return "mid";
+  if(st==="蔵書なし") return "none";
+  return ""; // 貸出中・予約中など → 朱
+}
+
+function renderBook(book, calil){
+  const wrap=document.createElement("div");
+  wrap.className="book";
+  let html='<div class="bkhead">'+(book.thumb?'<img src="'+book.thumb.replace("http://","https://")+'" alt="">':"")+
+    '<div><h2>'+book.title+'</h2><p class="meta">'+[book.authors,book.year&&book.year+"年"].filter(Boolean).join("／")+
+    '</p><p class="isbn">ISBN '+book.isbn+'</p></div></div>';
+
+  for(const [sysid,sysname] of Object.entries(SYSTEMS)){
+    const s=calil&&calil[sysid]; if(!s) continue;
+    html+='<div class="syswrap"><span class="sysname">'+sysname+'</span>';
+    const keys=Object.keys(s.libkey||{});
+    if(s.status==="Error"){ html+='<p class="meta">確認できませんでした（時間をおいて再検索してみてください）</p>'; }
+    else if(!keys.length){ html+='<p class="meta"><span class="stamp none">蔵書なし</span></p>'; }
+    else{
+      keys.sort((a,b)=>{
+        const na=NEAR.findIndex(n=>a.startsWith(n)), nb=NEAR.findIndex(n=>b.startsWith(n));
+        return (na<0?9:na)-(nb<0?9:nb) || a.localeCompare(b,"ja");
+      });
+      html+="<table>";
+      for(const lib of keys){
+        const st=s.libkey[lib];
+        const near=NEAR.some(n=>lib.startsWith(n))?'<span class="near">近く</span>':"";
+        html+="<tr><td>"+lib+"図書館"+near+'</td><td class="st"><span class="stamp '+stampClass(st)+'">'+st+"</span></td></tr>";
+      }
+      html+="</table>";
+    }
+    if(s.reserveurl){
+      const primary=sysid==="Kanagawa_Kawasaki";
+      html+='<a class="reserve'+(primary?"":" sub")+'" href="'+s.reserveurl+'" target="_blank" rel="noopener">'+
+        (primary?"予約ページを開く":"県立の詳細を見る")+" →</a>";
+    }
+    html+="</div>";
+  }
+  wrap.innerHTML=html;
+  return wrap;
+}
+
+async function checkOne(book){
+  const appkey=$("appkey").value.trim();
+  const systemids=[];
+  if($("sysCity").checked) systemids.push("Kanagawa_Kawasaki");
+  if($("sysPref").checked) systemids.push("Kanagawa_Pref");
+  if(!systemids.length){ setStatus("図書館をひとつ以上選んでください"); return; }
+  setStatus("図書館システムに問い合わせ中（少し時間がかかります）",true);
+  try{
+    const calil=await checkCalil(book.isbn, systemids, appkey);
+    setStatus("");
+    $("results").prepend(renderBook(book,calil));
+  }catch(e){
+    setStatus("カーリルに接続できませんでした。APIキーの設定を確認するか、このファイルをブラウザで直接開いてお試しください。");
+  }
+}
+
+async function run(){
+  const q=$("q").value.trim();
+  if(!q) return;
+  if(!$("appkey").value.trim()){ $("keybox").open=true; setStatus("先にカーリルAPIキーを設定してください（無料・1分で発行できます）"); return; }
+  $("candidates").innerHTML="";
+  const isbn=isIsbn(q);
+  if(isbn){ checkOne({isbn, title:"ISBN "+isbn, authors:"", year:"", thumb:null}); return; }
+  setStatus("本を検索中",true);
+  try{
+    const books=await searchBooks(q);
+    if(!books.length){ setStatus("見つかりませんでした。表記を変えるかISBNで試してみてください。"); return; }
+    setStatus("どの本か選んでください：");
+    for(const b of books){
+      const btn=document.createElement("button");
+      btn.className="cand";
+      btn.innerHTML=(b.thumb?'<img src="'+b.thumb.replace("http://","https://")+'" alt="">':"")+
+        "<span>"+b.title+"<small>"+[b.authors,b.year&&b.year+"年"].filter(Boolean).join("／")+"</small></span>";
+      btn.onclick=()=>{ $("candidates").innerHTML=""; checkOne(b); };
+      $("candidates").appendChild(btn);
+    }
+  }catch(e){ setStatus("検索に失敗しました。通信環境を確認してもう一度お試しください。"); }
+}
+$("searchBtn").onclick=run;
+$("q").addEventListener("keydown",e=>{ if(e.key==="Enter") run(); });
+</script>
+</body>
+</html>
